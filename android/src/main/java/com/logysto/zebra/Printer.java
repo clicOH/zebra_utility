@@ -264,8 +264,9 @@ public class Printer implements MethodChannel.MethodCallHandler {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ((Activity) context).requestPermissions(new String[]{
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_SCAN,
+                                Manifest.permission.BLUETOOTH_CONNECT,
+                                Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_ADVERTISE,
                         Manifest.permission.ACCESS_FINE_LOCATION
                 },PERMISSIONS_REQUEST_CODE);
             }else{

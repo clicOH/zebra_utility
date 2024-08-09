@@ -153,7 +153,7 @@ public class Printer implements MethodChannel.MethodCallHandler {
 
     }
 
-    private void checkPermission1(Context context, final MethodChannel.Result result) {
+    /*private void checkPermission1(Context context, final MethodChannel.Result result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
             if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_DENIED) {
@@ -255,7 +255,7 @@ public class Printer implements MethodChannel.MethodCallHandler {
         } else {
             result.success(true);
         }
-    }
+    }*/
 
 
     private void checkPermission(Context context, final MethodChannel.Result result) {
@@ -265,8 +265,9 @@ public class Printer implements MethodChannel.MethodCallHandler {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ((Activity) context).requestPermissions(new String[]{
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_SCAN,
+                                Manifest.permission.BLUETOOTH_CONNECT,
+                                Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_ADVERTISE,
                         Manifest.permission.ACCESS_FINE_LOCATION
                 },PERMISSIONS_REQUEST_CODE);
             }else{
@@ -299,85 +300,6 @@ public class Printer implements MethodChannel.MethodCallHandler {
                 } else {
                     result.success(true);
                 }
-
-               /*  if (context.checkSelfPermission(
-                        Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(
-                                Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-                        context.checkSelfPermission(
-                                Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                ) {
-
-                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                        if (requestCode == ACCESS_COARSE_BLUETOOTH_REQUEST_CODE) {
-                            if (grantResults.length > 0)
-                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                    try {
-                                        result.success(true);
-                                        return false;
-                                    } catch (Exception e) {
-                                        return false;
-                                    }
-                                }
-                        }
-                        try {
-                            result.success(false);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            result.success(false);
-                        }
-                        return false;
-                    });
-
-                }
-
-               if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_DENIED) {
-
-                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                        if (requestCode == ACCESS_COARSE_BLUETOOTH_SCAN_REQUEST_CODE) {
-                            if (grantResults.length > 0)
-                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                    try {
-                                        result.success(true);
-                                        return false;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                        return false;
-                                    }
-                                }
-                        }
-                        try {
-                            result.success(false);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            result.success(false);
-                        }
-                        return false;
-                    });
-                }
-
-                if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                        if (requestCode == ACCESS_COARSE_LOCATION_REQUEST_CODE) {
-                            if (grantResults.length > 0)
-                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                    try {
-                                        result.success(true);
-                                        return false;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                        return false;
-                                    }
-                                }
-                        }
-                        try {
-                            result.success(false);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            result.success(false);
-                        }
-                        return false;
-                    });}*/
             }
         }
     }

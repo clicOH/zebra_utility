@@ -19,6 +19,8 @@ import android.util.Base64;
 
 import androidx.annotation.NonNull;
 
+import com.zebra.barcode.sdk.BluetoothScannerInfo;
+import com.zebra.barcode.sdk.ZebraBarcodeScanner;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;
@@ -62,7 +64,6 @@ public class Printer implements MethodChannel.MethodCallHandler {
     private static int countEndScan = 0;
     private boolean isZebraPrinter = true;
     private Socketmanager socketmanager;
-
 
 
 
@@ -507,6 +508,8 @@ public class Printer implements MethodChannel.MethodCallHandler {
             setStatus(context.getString(R.string.sending_data), context.getString(R.string.connectingColor));
             printerConnection.write(bytes);
             DemoSleeper.sleep(1500);
+
+            BluetoothScannerInfo
 
             if (printerConnection instanceof BluetoothConnection) {
                 DemoSleeper.sleep(500);

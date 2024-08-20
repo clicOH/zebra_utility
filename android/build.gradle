@@ -23,6 +23,10 @@ apply plugin: 'com.android.library'
 
 android {
 
+    if (project.android.hasProperty("namespace")) {
+        namespace = "com.logysto.zebra"
+    }
+
     compileSdk 34
 
     compileOptions {

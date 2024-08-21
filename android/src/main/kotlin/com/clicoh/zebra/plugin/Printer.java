@@ -1,4 +1,4 @@
-package com.logysto.zebra;
+package com.clicoh.zebra.plugin;
 
 import android.Manifest;
 import android.app.Activity;
@@ -19,6 +19,7 @@ import android.util.Base64;
 
 import androidx.annotation.NonNull;
 
+import com.clicoh.zebra.R;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;

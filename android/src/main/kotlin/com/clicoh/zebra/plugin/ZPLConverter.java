@@ -1,4 +1,4 @@
-package com.logysto.zebra;
+package com.clicoh.zebra.plugin;
 
 import android.graphics.Bitmap;
 

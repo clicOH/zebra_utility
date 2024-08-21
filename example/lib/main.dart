@@ -11,7 +11,7 @@ void main() {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -85,7 +85,7 @@ class _MyAppState extends State<MyApp> {
           appBar: AppBar(
             title: const Text('Plugin example app'),
           ),
-          body: ScreenSettings()
+          body: const ScreenSettings()
       ),
     );
   }

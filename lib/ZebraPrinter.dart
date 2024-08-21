@@ -66,7 +66,7 @@ class ZebraPrinter {
 
     try {
       channel.invokeMethod("setSettings", {"SettingCommand": command});
-    } on PlatformException catch (e) {
+    } on PlatformException {
 
     }
   }

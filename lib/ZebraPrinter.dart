@@ -1,6 +1,9 @@
+import 'dart:developer';
+
 import 'package:flutter/services.dart';
 
 enum EnumMediaType { Label, BlackMark, Journal }
+
 enum Command { calibrate, mediaType, darkness }
 
 class ZebraPrinter {
@@ -22,11 +25,12 @@ class ZebraPrinter {
   }
 
   discoveryPrinters() {
+    log("Check permissions");
     channel.invokeMethod("checkPermission").then((isGrantPermission) {
       if (isGrantPermission) {
         channel.invokeMethod("discoverPrinters");
       } else {
-       if (onPermissionDenied != null) onPermissionDenied!();
+        if (onPermissionDenied != null) onPermissionDenied!();
       }
     });
   }
@@ -66,9 +70,7 @@ class ZebraPrinter {
 
     try {
       channel.invokeMethod("setSettings", {"SettingCommand": command});
-    } on PlatformException {
-
-    }
+    } on PlatformException {}
   }
 
   setDarkness(int darkness) {
@@ -124,8 +126,8 @@ class ZebraPrinter {
     } else if (methodCall.method == "onPrinterDiscoveryDone") {
       onPrinterDiscoveryDone!();
     } else if (methodCall.method == "onDiscoveryError") {
-      onDiscoveryError!(methodCall.arguments["ErrorCode"]
-          , methodCall.arguments["ErrorText"]);
+      onDiscoveryError!(
+          methodCall.arguments["ErrorCode"], methodCall.arguments["ErrorText"]);
     }
     return null;
   }

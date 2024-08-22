@@ -16,6 +16,7 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -158,14 +159,37 @@ public class Printer implements MethodChannel.MethodCallHandler {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 
-                if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_DENIED ||
-                        context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_DENIED ||
-                        context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_DENIED) {
+                Log.d("TAG", "checkPermission: ");
+
+                int permissionBluetoothConnect = context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT);
+
+                int permissionBluetoothScan = context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN);
+
+                int permissionAccessCoarseLocation = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION);
+
+
+                Log.d("TAG", "permissionBluetoothConnect: " + permissionBluetoothConnect);
+
+                Log.d("TAG", "permissionBluetoothScan: " + permissionBluetoothScan);
+
+                Log.d("TAG", "permissionAccessCoarseLocation: " + permissionAccessCoarseLocation);
+
+
+                if (permissionBluetoothConnect == PackageManager.PERMISSION_GRANTED &&
+                        permissionBluetoothScan == PackageManager.PERMISSION_GRANTED &&
+                        permissionAccessCoarseLocation == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("TAG", "PERMISSION_GRANTED");
+                    result.success(true);
+                } else {
+                    Log.d("TAG", "PERMISSION_DENIED");
+
                     binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
+                        Log.d("TAG", "result code: " + requestCode);
                         if (requestCode == PERMISSIONS_REQUEST_CODE) {
                             if (grantResults.length > 0)
                                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                                     try {
+                                        Log.d("TAG", "result:  TRUE");
                                         result.success(true);
                                         return false;
                                     } catch (Exception e) {
@@ -181,17 +205,19 @@ public class Printer implements MethodChannel.MethodCallHandler {
                         }
                         return false;
                     });
+
+
+                    ((Activity) context).requestPermissions(new String[]{
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                    }, PERMISSIONS_REQUEST_CODE);
                 }
-                ((Activity) context).requestPermissions(new String[]{
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_SCAN,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                }, PERMISSIONS_REQUEST_CODE);
-
-
             } else {
                 if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
+                        Log.d("TAG", "result code: " + requestCode);
+
                         if (requestCode == ACCESS_COARSE_LOCATION_REQUEST_CODE) {
                             if (grantResults.length > 0)
                                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {

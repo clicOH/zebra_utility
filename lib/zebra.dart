@@ -1,3 +1,4 @@
+
 import 'package:zebra/ZebraPrinter.dart';
 
 import 'zebra_platform_interface.dart';
@@ -9,10 +10,10 @@ class Zebra {
 
   Future<ZebraPrinter> getPrinterInstance(
       {Function(String name, String ipAddress, bool isWifi)? onPrinterFound,
-      onPrinterDiscoveryDone,
-      Function(int errorCode, String errorText)? onDiscoveryError,
-      Function(String status, String color)? onChangePrinterStatus,
-      onPermissionDenied}) {
+        onPrinterDiscoveryDone,
+        Function(int errorCode, String errorText)? onDiscoveryError,
+        Function(String status, String color)? onChangePrinterStatus,
+        onPermissionDenied}) {
     return ZebraPlatform.instance.getPrinterInstance(
         onPrinterFound: onPrinterFound,
         onPrinterDiscoveryDone: onPrinterDiscoveryDone,

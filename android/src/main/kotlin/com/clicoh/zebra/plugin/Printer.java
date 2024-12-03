@@ -1,4 +1,4 @@
-package com.logysto.zebra;
+package com.clicoh.zebra.plugin;
 
 import android.Manifest;
 import android.app.Activity;
@@ -16,11 +16,11 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.zebra.barcode.sdk.BluetoothScannerInfo;
-import com.zebra.barcode.sdk.ZebraBarcodeScanner;
+import com.clicoh.zebra.R;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;
@@ -64,8 +64,6 @@ public class Printer implements MethodChannel.MethodCallHandler {
     private static int countEndScan = 0;
     private boolean isZebraPrinter = true;
     private Socketmanager socketmanager;
-
-
 
 
     public Printer(ActivityPluginBinding binding, BinaryMessenger binaryMessenger) {
@@ -153,110 +151,6 @@ public class Printer implements MethodChannel.MethodCallHandler {
 
     }
 
-    /*private void checkPermission1(Context context, final MethodChannel.Result result) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-            if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_DENIED) {
-
-                binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                    if (requestCode == ACCESS_COARSE_BLUETOOTH_REQUEST_CODE) {
-                        if (grantResults.length > 0)
-                            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                try {
-                                    result.success(true);
-                                    return false;
-                                } catch (Exception e) {
-                                    return false;
-                                }
-                            }
-                    }
-                    try {
-                        result.success(false);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        result.success(false);
-                    }
-                    return false;
-                });
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ((Activity) context).requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT
-                            },
-                            ACCESS_COARSE_BLUETOOTH_REQUEST_CODE);
-                }
-
-            }
-
-
-            if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_DENIED) {
-
-                binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                    if (requestCode == ACCESS_COARSE_BLUETOOTH_SCAN_REQUEST_CODE) {
-                        if (grantResults.length > 0)
-                            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                try {
-                                    result.success(true);
-                                    return false;
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    return false;
-                                }
-                            }
-                    }
-                    try {
-                        result.success(false);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        result.success(false);
-                    }
-                    return false;
-                });
-
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ((Activity) context).requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN
-                            },
-                            ACCESS_COARSE_BLUETOOTH_SCAN_REQUEST_CODE);
-                }
-
-
-            }
-
-
-            if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                    if (requestCode == ACCESS_COARSE_LOCATION_REQUEST_CODE) {
-                        if (grantResults.length > 0)
-                            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                try {
-                                    result.success(true);
-                                    return false;
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    return false;
-                                }
-                            }
-                    }
-                    try {
-                        result.success(false);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        result.success(false);
-                    }
-                    return false;
-                });
-                ((Activity) context).requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION
-                        },
-                        ACCESS_COARSE_LOCATION_REQUEST_CODE);
-
-            } else {
-                result.success(true);
-            }
-        } else {
-            result.success(true);
-        }
-    }*/
-
 
     private void checkPermission(Context context, final MethodChannel.Result result) {
 
@@ -264,15 +158,66 @@ public class Printer implements MethodChannel.MethodCallHandler {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ((Activity) context).requestPermissions(new String[]{
-                                Manifest.permission.BLUETOOTH_CONNECT,
-                                Manifest.permission.BLUETOOTH_SCAN,
-                        Manifest.permission.BLUETOOTH_ADVERTISE,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                },PERMISSIONS_REQUEST_CODE);
-            }else{
+
+                Log.d("TAG", "checkPermission: ");
+
+                int permissionBluetoothConnect = context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT);
+
+                int permissionBluetoothScan = context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN);
+
+                int permissionAccessCoarseLocation = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION);
+
+
+                Log.d("TAG", "permissionBluetoothConnect: " + permissionBluetoothConnect);
+
+                Log.d("TAG", "permissionBluetoothScan: " + permissionBluetoothScan);
+
+                Log.d("TAG", "permissionAccessCoarseLocation: " + permissionAccessCoarseLocation);
+
+
+                if (permissionBluetoothConnect == PackageManager.PERMISSION_GRANTED &&
+                        permissionBluetoothScan == PackageManager.PERMISSION_GRANTED &&
+                        permissionAccessCoarseLocation == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("TAG", "PERMISSION_GRANTED");
+                    result.success(true);
+                } else {
+                    Log.d("TAG", "PERMISSION_DENIED");
+
+                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
+                        Log.d("TAG", "result code: " + requestCode);
+                        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+                            if (grantResults.length > 0)
+                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                                    try {
+                                        Log.d("TAG", "result:  TRUE");
+                                        result.success(true);
+                                        return false;
+                                    } catch (Exception e) {
+                                        return false;
+                                    }
+                                }
+                        }
+                        try {
+                            result.success(false);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            result.success(false);
+                        }
+                        return false;
+                    });
+
+
+                    ((Activity) context).requestPermissions(new String[]{
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                    }, PERMISSIONS_REQUEST_CODE);
+                }
+            } else {
                 if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
+                        Log.d("TAG", "result code: " + requestCode);
+
                         if (requestCode == ACCESS_COARSE_LOCATION_REQUEST_CODE) {
                             if (grantResults.length > 0)
                                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -301,6 +246,8 @@ public class Printer implements MethodChannel.MethodCallHandler {
                     result.success(true);
                 }
             }
+        } else {
+            result.success(true);
         }
     }
 
@@ -430,8 +377,6 @@ public class Printer implements MethodChannel.MethodCallHandler {
             setStatus(context.getString(R.string.sending_data), context.getString(R.string.connectingColor));
             printerConnection.write(bytes);
             DemoSleeper.sleep(1500);
-
-            BluetoothScannerInfo
 
             if (printerConnection instanceof BluetoothConnection) {
                 DemoSleeper.sleep(500);

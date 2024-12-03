@@ -3,14 +3,15 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:zebra/zebra.dart';
-import 'package:zebra_example/ScreenSettings.dart';
+
+import 'ScreenSettings.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -36,11 +37,11 @@ class _MyAppState extends State<MyApp> {
           await _zebraPlugin.getPlatformVersion() ?? 'Unknown platform version';
 
       _zebraPlugin.getPrinterInstance(
- onPrinterDiscoveryDone: onPrinterDiscoveryDone,
-        onPermissionDenied: onPermissionDenied,
-        onChangePrinterStatus: onChangePrinterStatus,
-        onDiscoveryError: onDiscoveryError,
-        onPrinterFound: onPrinterFound
+          onPrinterDiscoveryDone: onPrinterDiscoveryDone,
+          onPermissionDenied: onPermissionDenied,
+          onChangePrinterStatus: onChangePrinterStatus,
+          onDiscoveryError: onDiscoveryError,
+          onPrinterFound: onPrinterFound
 
       );
     } on PlatformException {
@@ -81,10 +82,10 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: ScreenSettings()
+          appBar: AppBar(
+            title: const Text('Plugin example app'),
+          ),
+          body: const ScreenSettings()
       ),
     );
   }

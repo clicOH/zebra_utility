@@ -5,7 +5,7 @@ import 'package:zebra/zebra.dart';
 import 'package:zebra_example/model_drivers.dart';
 
 class ScreenSettings extends StatefulWidget {
-  const ScreenSettings({Key? key}) : super(key: key);
+  const ScreenSettings({super.key});
 
   @override
  State<ScreenSettings>  createState() => _ScreenSettingsState();
@@ -270,14 +270,14 @@ class _ScreenSettingsState extends State<ScreenSettings> {
                 children: <Widget>[
                   Expanded(
                     child: ElevatedButton(
-                      child:Text("Actualizar"),
                       onPressed: _discoveryPrinters,
+                      child:const Text("Actualizar"),
                       ),
                     ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      child: Text('Conectar'),
+                      child: const Text('Conectar'),
 
                       onPressed: () {
 
@@ -289,7 +289,7 @@ class _ScreenSettingsState extends State<ScreenSettings> {
                   ),
                   Expanded(
                     child: ElevatedButton(
-                      child: Text( 'Descon'),
+                      child: const Text( 'Descon'),
 
                       onPressed: () {
 
@@ -303,7 +303,7 @@ class _ScreenSettingsState extends State<ScreenSettings> {
               ),
               const SizedBox(height: 20),
 
-              ElevatedButton(child: Text("Prueba de impresión"),  onPressed: (){_printTest();})
+              ElevatedButton(child: const Text("Prueba de impresión"),  onPressed: (){_printTest();})
 
             ],
           ),

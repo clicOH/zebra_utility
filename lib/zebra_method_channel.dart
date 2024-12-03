@@ -16,8 +16,7 @@ class MethodChannelZebra extends ZebraPlatform {
     return version;
   }
 
-
-@override
+  @override
   Future<ZebraPrinter> getPrinterInstance(
       {Function(String name, String ipAddress, bool isWifi)? onPrinterFound,
         onPrinterDiscoveryDone,

@@ -3,7 +3,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package com.logysto.zebra;
+package com.clicoh.zebra.plugin;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;

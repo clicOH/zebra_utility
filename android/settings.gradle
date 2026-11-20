@@ -1,2 +1,2 @@
 rootProject.name = 'zebra'
-include ':BarcodeScannerLibrary', ':scannercontrol'
+include ':BarcodeScannerLibrary'

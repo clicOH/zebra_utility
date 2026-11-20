@@ -688,7 +688,25 @@ public class Printer implements MethodChannel.MethodCallHandler {
                             , Integer.parseInt(Objects.requireNonNull(call.argument("rotation")).toString()), result);
                     break;
                 case "disconnect":
-                    new Thread(this::disconnect).start();
+                    new Thread(() -> {
+                        try {
+                            disconnect();
+                            ((Activity) context).runOnUiThread(() -> {
+                                try {
+                                    result.success(null);
+                                } catch (Exception ignored) {
+                                }
+                            });
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                            ((Activity) context).runOnUiThread(() -> {
+                                try {
+                                    result.error("disconnect_failed", ex.getMessage(), null);
+                                } catch (Exception ignored) {
+                                }
+                            });
+                        }
+                    }).start();
                     break;
                 case "isPrinterConnected":
                     isPrinterConnect();
@@ -716,28 +734,16 @@ public class Printer implements MethodChannel.MethodCallHandler {
                     setDarkness(darkness);
                     break;
                 case "connectToPrinter":
-
                     new Thread(() -> {
-                        final boolean r = false;
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            connectToSelectPrinter(call.argument("Address"));
-                        } else {
-                            connectToSelectPrinter(call.argument("Address"));
-                        }
-                        ((Activity) context).runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                String addrss = call.argument("Address");
-
-                                print("MY ADDRESS : " + addrss);
-
-                                if (r) result.success(true);
-                                else result.success(false);
+                        final boolean connected = connectToSelectPrinter(call.argument("Address"));
+                        Log.d("ZebraPrinter", "connect address: " + call.argument("Address") + " connected=" + connected);
+                        ((Activity) context).runOnUiThread(() -> {
+                            try {
+                                result.success(connected);
+                            } catch (Exception ignored) {
                             }
                         });
                     }).start();
-
                     break;
                 case ("connectToGenericPrinter"):
                     connectToGenericPrinter(call.argument("Address"));

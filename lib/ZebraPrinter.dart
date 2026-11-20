@@ -98,8 +98,8 @@ class ZebraPrinter {
     channel.invokeMethod("print", {"Data": data});
   }
 
-  dynamic disconnect() {
-    channel.invokeMethod("disconnect", null);
+  Future<void> disconnect() {
+    return channel.invokeMethod<void>("disconnect");
   }
 
   void calibratePrinter() {

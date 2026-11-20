@@ -24,7 +24,7 @@ class ZebraPrinter {
     channel.setMethodCallHandler(nativeMethodCallHandler);
   }
 
-  discoveryPrinters() {
+  void discoveryPrinters() {
     log("Check permissions");
     channel.invokeMethod("checkPermission").then((isGrantPermission) {
       if (isGrantPermission) {
@@ -35,7 +35,7 @@ class ZebraPrinter {
     });
   }
 
-  _setSettings(Command setting, dynamic values) {
+  void _setSettings(Command setting, dynamic values) {
     String command = "";
     switch (setting) {
       case Command.mediaType:
@@ -73,23 +73,23 @@ class ZebraPrinter {
     } on PlatformException {}
   }
 
-  setDarkness(int darkness) {
+  void setDarkness(int darkness) {
     _setSettings(Command.darkness, darkness.toString());
   }
 
-  setMediaType(EnumMediaType mediaType) {
+  void setMediaType(EnumMediaType mediaType) {
     _setSettings(Command.mediaType, mediaType);
   }
 
-  connectToPrinter(String address) {
+  void connectToPrinter(String address) {
     channel.invokeMethod("connectToPrinter", {"Address": address});
   }
 
-  connectToGenericPrinter(String address) {
+  void connectToGenericPrinter(String address) {
     channel.invokeMethod("connectToGenericPrinter", {"Address": address});
   }
 
-  print(String data) {
+  void print(String data) {
     if (!data.contains("^PON")) data = data.replaceAll("^XA", "^XA^PON");
 
     if (isRotated) {
@@ -98,19 +98,19 @@ class ZebraPrinter {
     channel.invokeMethod("print", {"Data": data});
   }
 
-  disconnect() {
+  dynamic disconnect() {
     channel.invokeMethod("disconnect", null);
   }
 
-  calibratePrinter() {
+  void calibratePrinter() {
     _setSettings(Command.calibrate, null);
   }
 
-  isPrinterConnected() {
+  void isPrinterConnected() {
     channel.invokeMethod("isPrinterConnected");
   }
 
-  rotate() {
+  void rotate() {
     isRotated = !isRotated;
   }
 

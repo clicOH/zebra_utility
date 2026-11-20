@@ -125,7 +125,7 @@ class _ScreenSettingsState extends State<ScreenSettings> {
         await rootBundle.loadString('assets/json/config_portatil.txt');
   }
 
-  void _onPrinterFound(name, ipAddress, isWifi) {
+  void _onPrinterFound(String name, String ipAddress, bool isWifi) {
     print("PrinterFound :" + name + ipAddress);
 
     _devices.add(ModelDrivers(name: name, address: ipAddress));
@@ -138,7 +138,7 @@ class _ScreenSettingsState extends State<ScreenSettings> {
    print("Discovery Done");
   }
 
-  void _onChangePrinterStatus(status, color) {
+  void _onChangePrinterStatus(String status, String color) {
     print(
         "change printer status: " + status + color);
     print("onChangePrinterStatus $status $color");
@@ -162,7 +162,7 @@ class _ScreenSettingsState extends State<ScreenSettings> {
    print("Permission Deny.");
   }
 
-  void _onDiscoveryError(code, state) {
+  void _onDiscoveryError(int code, String state) {
    print("Discovery Error $code $state");
   }
 

@@ -70,7 +70,7 @@ class _MyAppState extends State<MyApp> {
     print("Discovery Done");
   }
 
-  void onChangePrinterStatus (status, color) {
+  void onChangePrinterStatus(String status, String color) {
     print("change printer status: " + status + color);
   }
 

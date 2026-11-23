@@ -14,6 +14,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.location.LocationManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 
 import androidx.annotation.NonNull;
@@ -182,8 +184,13 @@ public class Printer implements MethodChannel.MethodCallHandler {
             @Override
             public boolean onRequestPermissionsResult(int code, String[] permissions, int[] grantResults) {
                 if (code != requestCode) return false;
-                binding.removeRequestPermissionsResultListener(this);
+                final PluginRegistry.RequestPermissionsResultListener self = this;
                 pendingPermissionListener = null;
+                // Flutter iterates its listener set while dispatching this callback, so
+                // removing the listener here throws ConcurrentModificationException.
+                // Defer the removal until the dispatch loop has finished.
+                new Handler(Looper.getMainLooper()).post(
+                        () -> binding.removeRequestPermissionsResultListener(self));
                 result.success(allGranted(grantResults));
                 return true;
             }

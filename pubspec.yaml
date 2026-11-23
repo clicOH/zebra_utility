@@ -1,7 +1,7 @@
 name: zebra
-description: "A new Flutter project."
-version: 0.0.1
-homepage:
+description: "Plugin de Flutter para buscar e imprimir etiquetas ZPL en impresoras Zebra (Bluetooth y red) con el SDK Link-OS Multiplatform. Solo Android."
+version: 0.1.0
+homepage: https://github.com/clicOH/zebra_utility
 
 environment:
   sdk: ^3.12.0
@@ -36,8 +36,6 @@ flutter:
     platforms:
       android:
         package: com.clicoh.zebra
-        pluginClass: ZebraPlugin
-      ios:
         pluginClass: ZebraPlugin
 
   # To add assets to your plugin package, add an assets section, like this:

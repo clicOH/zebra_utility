@@ -1,4 +1,2 @@
-package android.BarcodeScannerLibrary
-
 configurations.create("default")
 artifacts.add("default", file('barcode_scanner_library_v2.6.21.0-release.aar'))

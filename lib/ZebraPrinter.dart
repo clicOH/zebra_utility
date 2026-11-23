@@ -1,13 +1,9 @@
-import 'dart:developer';
-
 import 'package:flutter/services.dart';
 
 enum EnumMediaType { Label, BlackMark, Journal }
 
-enum Command { calibrate, mediaType, darkness }
-
 class ZebraPrinter {
-  late MethodChannel channel;
+  final MethodChannel channel;
 
   Function? onPrinterFound;
   Function? onPrinterDiscoveryDone;
@@ -17,97 +13,91 @@ class ZebraPrinter {
 
   bool isRotated = false;
 
-  ZebraPrinter(String id, this.onPrinterFound, this.onPrinterDiscoveryDone,
-      this.onDiscoveryError, this.onChangePrinterStatus,
-      {this.onPermissionDenied}) {
-    channel = MethodChannel('ZebraPrinterObject$id');
+  ZebraPrinter(
+    String id,
+    this.onPrinterFound,
+    this.onPrinterDiscoveryDone,
+    this.onDiscoveryError,
+    this.onChangePrinterStatus, {
+    this.onPermissionDenied,
+  }) : channel = MethodChannel('ZebraPrinterObject$id') {
     channel.setMethodCallHandler(nativeMethodCallHandler);
   }
 
+  /// Checks permissions and starts the discovery. Results arrive through the
+  /// callbacks passed to the constructor.
   void discoveryPrinters() {
-    log("Check permissions");
-    channel.invokeMethod("checkPermission").then((isGrantPermission) {
-      if (isGrantPermission) {
+    channel.invokeMethod<bool>("checkPermission").then((granted) {
+      if (granted == true) {
         channel.invokeMethod("discoverPrinters");
       } else {
-        if (onPermissionDenied != null) onPermissionDenied!();
+        onPermissionDenied?.call();
       }
     });
   }
 
-  void _setSettings(Command setting, dynamic values) {
-    String command = "";
-    switch (setting) {
-      case Command.mediaType:
-        if (values == EnumMediaType.BlackMark) {
-          command = '''
-          ! U1 setvar "media.type" "label"
-          ! U1 setvar "media.sense_mode" "bar"
-          ''';
-        } else if (values == EnumMediaType.Journal) {
-          command = '''
-          ! U1 setvar "media.type" "journal"
-          ''';
-        } else if (values == EnumMediaType.Label) {
-          command = '''
-          ! U1 setvar "media.type" "label"
-           ! U1 setvar "media.sense_mode" "gap"
-          ''';
-        }
+  Future<void> _sendSettings(String command) {
+    return channel.invokeMethod<void>(
+        "setSettings", {"SettingCommand": command});
+  }
 
-        break;
-      case Command.calibrate:
-        command = '''~jc^xa^jus^xz''';
-        break;
-      case Command.darkness:
-        command = '''! U1 setvar "print.tone" "$values"''';
-        break;
+  static String _mediaTypeCommand(EnumMediaType mediaType) {
+    switch (mediaType) {
+      case EnumMediaType.BlackMark:
+        return '! U1 setvar "media.type" "label"\n'
+            '! U1 setvar "media.sense_mode" "bar"\n';
+      case EnumMediaType.Journal:
+        return '! U1 setvar "media.type" "journal"\n';
+      case EnumMediaType.Label:
+        return '! U1 setvar "media.type" "label"\n'
+            '! U1 setvar "media.sense_mode" "gap"\n';
     }
-
-    if (setting == Command.calibrate) {
-      command = '''~jc^xa^jus^xz''';
-    }
-
-    try {
-      channel.invokeMethod("setSettings", {"SettingCommand": command});
-    } on PlatformException {}
   }
 
-  void setDarkness(int darkness) {
-    _setSettings(Command.darkness, darkness.toString());
+  Future<void> setDarkness(int darkness) {
+    return _sendSettings('! U1 setvar "print.tone" "$darkness"');
   }
 
-  void setMediaType(EnumMediaType mediaType) {
-    _setSettings(Command.mediaType, mediaType);
+  Future<void> setMediaType(EnumMediaType mediaType) {
+    return _sendSettings(_mediaTypeCommand(mediaType));
   }
 
-  void connectToPrinter(String address) {
-    channel.invokeMethod("connectToPrinter", {"Address": address});
+  Future<void> calibratePrinter() {
+    return _sendSettings('~jc^xa^jus^xz');
   }
 
-  void connectToGenericPrinter(String address) {
-    channel.invokeMethod("connectToGenericPrinter", {"Address": address});
+  /// Returns true when the printer accepted the connection.
+  Future<bool> connectToPrinter(String address) async {
+    return (await channel
+            .invokeMethod<bool>("connectToPrinter", {"Address": address})) ??
+        false;
   }
 
-  void print(String data) {
+  /// Returns true when the generic (raw socket, port 9100) printer connected.
+  Future<bool> connectToGenericPrinter(String address) async {
+    return (await channel.invokeMethod<bool>(
+            "connectToGenericPrinter", {"Address": address})) ??
+        false;
+  }
+
+  /// Sends ZPL to the connected printer. Returns true when the data was sent.
+  Future<bool> print(String data) async {
     if (!data.contains("^PON")) data = data.replaceAll("^XA", "^XA^PON");
 
     if (isRotated) {
       data = data.replaceAll("^PON", "^POI");
     }
-    channel.invokeMethod("print", {"Data": data});
+    return (await channel.invokeMethod<bool>("print", {"Data": data})) ??
+        false;
   }
 
   Future<void> disconnect() {
     return channel.invokeMethod<void>("disconnect");
   }
 
-  void calibratePrinter() {
-    _setSettings(Command.calibrate, null);
-  }
-
-  void isPrinterConnected() {
-    channel.invokeMethod("isPrinterConnected");
+  /// Returns true when the printer connection is alive.
+  Future<bool> isPrinterConnected() async {
+    return (await channel.invokeMethod<bool>("isPrinterConnected")) ?? false;
   }
 
   void rotate() {
@@ -115,22 +105,24 @@ class ZebraPrinter {
   }
 
   Future<dynamic> nativeMethodCallHandler(MethodCall methodCall) async {
-    if (methodCall.method == "printerFound") {
-      onPrinterFound!(
-          methodCall.arguments["Name"],
-          methodCall.arguments["Address"],
-          methodCall.arguments["IsWifi"].toString() == "true" ? true : false);
-    } else if (methodCall.method == "changePrinterStatus") {
-      onChangePrinterStatus!(
-          methodCall.arguments["Status"], methodCall.arguments["Color"]);
-    } else if (methodCall.method == "onPrinterDiscoveryDone") {
-      onPrinterDiscoveryDone!();
-    } else if (methodCall.method == "onDiscoveryError") {
-      onDiscoveryError!(
-          methodCall.arguments["ErrorCode"], methodCall.arguments["ErrorText"]);
+    final Map<dynamic, dynamic> args =
+        methodCall.arguments is Map ? methodCall.arguments as Map : {};
+
+    switch (methodCall.method) {
+      case "printerFound":
+        onPrinterFound?.call(
+            args["Name"], args["Address"], args["IsWifi"] == true);
+        break;
+      case "changePrinterStatus":
+        onChangePrinterStatus?.call(args["Status"], args["Color"]);
+        break;
+      case "onPrinterDiscoveryDone":
+        onPrinterDiscoveryDone?.call();
+        break;
+      case "onDiscoveryError":
+        onDiscoveryError?.call(args["ErrorCode"], args["ErrorText"]);
+        break;
     }
     return null;
   }
-
-  String? id;
 }

@@ -14,9 +14,7 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.location.LocationManager;
 import android.os.Build;
-import android.os.Looper;
 import android.util.Base64;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -40,31 +38,35 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugin.common.PluginRegistry;
 
 public class Printer implements MethodChannel.MethodCallHandler {
 
     private static final int PERMISSIONS_REQUEST_CODE = 100020;
     private static final int ACCESS_COARSE_LOCATION_REQUEST_CODE = 10021;
-    private static final int ACCESS_COARSE_BLUETOOTH_REQUEST_CODE = 10022;
-    private static final int ACCESS_COARSE_BLUETOOTH_SCAN_REQUEST_CODE = 10023;
+
     private static final int ON_DISCOVERY_ERROR_GENERAL = -1;
     private static final int ON_DISCOVERY_ERROR_BLUETOOTH = -2;
     private static final int ON_DISCOVERY_ERROR_LOCATION = -3;
-    private Connection printerConnection;
-    private ZebraPrinter printer;
-    private Context context;
-    private ActivityPluginBinding binding;
-    private MethodChannel methodChannel;
-    private String selectedAddress = null;
-    private String macAddress = null;
-    private boolean tempIsPrinterConnect;
-    private static ArrayList<DiscoveredPrinter> discoveredPrinters = new ArrayList<>();
-    private static ArrayList<DiscoveredPrinter> sendedDiscoveredPrinters = new ArrayList<>();
+
+    // Discovered printers are static on purpose: a new Dart ZebraPrinter instance
+    // replays them after a discovery. countDiscovery/countEndScan are reset on each
+    // user-initiated discovery (see discoveryPrinters).
+    private static final ArrayList<DiscoveredPrinter> discoveredPrinters = new ArrayList<>();
+    private static final ArrayList<DiscoveredPrinter> sendedDiscoveredPrinters = new ArrayList<>();
     private static int countDiscovery = 0;
     private static int countEndScan = 0;
+
+    private Connection printerConnection;
+    private ZebraPrinter printer;
+    private final Context context;
+    private final ActivityPluginBinding binding;
+    private final MethodChannel methodChannel;
+    private String selectedAddress = null;
+    private String macAddress = null;
     private boolean isZebraPrinter = true;
     private Socketmanager socketmanager;
-
+    private PluginRegistry.RequestPermissionsResultListener pendingPermissionListener;
 
     public Printer(ActivityPluginBinding binding, BinaryMessenger binaryMessenger) {
         this.context = binding.getActivity();
@@ -73,26 +75,23 @@ public class Printer implements MethodChannel.MethodCallHandler {
         methodChannel.setMethodCallHandler(this);
     }
 
-
+    /** Starts a new user-initiated discovery (Bluetooth and network). */
     public static void discoveryPrinters(final Context context, final MethodChannel methodChannel) {
+        countDiscovery = 0;
+        startDiscovery(context, methodChannel);
+    }
 
+    private static void startDiscovery(final Context context, final MethodChannel methodChannel) {
         try {
             sendedDiscoveredPrinters.clear();
-            for (DiscoveredPrinter dp :
-                    discoveredPrinters) {
+            for (DiscoveredPrinter dp : discoveredPrinters) {
                 addNewDiscoverPrinter(dp, context, methodChannel);
             }
             countEndScan = 0;
             BluetoothDiscoverer.findPrinters(context, new DiscoveryHandler() {
                 @Override
                 public void foundPrinter(final DiscoveredPrinter discoveredPrinter) {
-                    discoveredPrinters.add(discoveredPrinter);
-                    ((Activity) context).runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            addNewDiscoverPrinter(discoveredPrinter, context, methodChannel);
-                        }
-                    });
+                    addNewDiscoverPrinter(discoveredPrinter, context, methodChannel);
                 }
 
                 @Override
@@ -112,12 +111,10 @@ public class Printer implements MethodChannel.MethodCallHandler {
                 }
             });
 
-
             NetworkDiscoverer.findPrinters(new DiscoveryHandler() {
                 @Override
                 public void foundPrinter(DiscoveredPrinter discoveredPrinter) {
                     addNewDiscoverPrinter(discoveredPrinter, context, methodChannel);
-
                 }
 
                 @Override
@@ -139,136 +136,81 @@ public class Printer implements MethodChannel.MethodCallHandler {
     }
 
     private static void onDiscoveryError(Context context, final MethodChannel methodChannel, final int errorCode, final String errorText) {
-        ((Activity) context).runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                HashMap<String, Object> arguments = new HashMap<>();
-                arguments.put("ErrorCode", errorCode);
-                arguments.put("ErrorText", errorText);
-                methodChannel.invokeMethod("onDiscoveryError", arguments);
-            }
+        ((Activity) context).runOnUiThread(() -> {
+            HashMap<String, Object> arguments = new HashMap<>();
+            arguments.put("ErrorCode", errorCode);
+            arguments.put("ErrorText", errorText);
+            methodChannel.invokeMethod("onDiscoveryError", arguments);
         });
-
     }
 
-
-    private void checkPermission(Context context, final MethodChannel.Result result) {
-
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-
-                Log.d("TAG", "checkPermission: ");
-
-                int permissionBluetoothConnect = context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT);
-
-                int permissionBluetoothScan = context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN);
-
-                int permissionAccessCoarseLocation = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION);
-
-
-                Log.d("TAG", "permissionBluetoothConnect: " + permissionBluetoothConnect);
-
-                Log.d("TAG", "permissionBluetoothScan: " + permissionBluetoothScan);
-
-                Log.d("TAG", "permissionAccessCoarseLocation: " + permissionAccessCoarseLocation);
-
-
-                if (permissionBluetoothConnect == PackageManager.PERMISSION_GRANTED &&
-                        permissionBluetoothScan == PackageManager.PERMISSION_GRANTED &&
-                        permissionAccessCoarseLocation == PackageManager.PERMISSION_GRANTED) {
-                    Log.d("TAG", "PERMISSION_GRANTED");
-                    result.success(true);
-                } else {
-                    Log.d("TAG", "PERMISSION_DENIED");
-
-                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                        Log.d("TAG", "result code: " + requestCode);
-                        if (requestCode == PERMISSIONS_REQUEST_CODE) {
-                            if (grantResults.length > 0)
-                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                    try {
-                                        Log.d("TAG", "result:  TRUE");
-                                        result.success(true);
-                                        return false;
-                                    } catch (Exception e) {
-                                        return false;
-                                    }
-                                }
-                        }
-                        try {
-                            result.success(false);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            result.success(false);
-                        }
-                        return false;
-                    });
-
-
-                    ((Activity) context).requestPermissions(new String[]{
-                            Manifest.permission.BLUETOOTH_CONNECT,
-                            Manifest.permission.BLUETOOTH_SCAN,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                    }, PERMISSIONS_REQUEST_CODE);
-                }
-            } else {
-                if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    binding.addRequestPermissionsResultListener((requestCode, permissions, grantResults) -> {
-                        Log.d("TAG", "result code: " + requestCode);
-
-                        if (requestCode == ACCESS_COARSE_LOCATION_REQUEST_CODE) {
-                            if (grantResults.length > 0)
-                                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                                    try {
-                                        result.success(true);
-                                        return false;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                        return false;
-                                    }
-                                }
-                        }
-                        try {
-                            result.success(false);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            result.success(false);
-                        }
-                        return false;
-                    });
-                    ((Activity) context).requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION
-                            },
-                            ACCESS_COARSE_LOCATION_REQUEST_CODE);
-
-                } else {
-                    result.success(true);
-                }
-            }
-        } else {
+    private void checkPermission(final MethodChannel.Result result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             result.success(true);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestPermissionsIfMissing(new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+            }, PERMISSIONS_REQUEST_CODE, result);
+        } else {
+            requestPermissionsIfMissing(new String[]{
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }, ACCESS_COARSE_LOCATION_REQUEST_CODE, result);
         }
     }
 
+    private void requestPermissionsIfMissing(final String[] permissions, final int requestCode, final MethodChannel.Result result) {
+        for (String permission : permissions) {
+            if (context.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                awaitPermissionResult(requestCode, result);
+                ((Activity) context).requestPermissions(permissions, requestCode);
+                return;
+            }
+        }
+        result.success(true);
+    }
+
+    /** Listens only for the given request code and replies once with whether all were granted. */
+    private void awaitPermissionResult(final int requestCode, final MethodChannel.Result result) {
+        if (pendingPermissionListener != null) {
+            binding.removeRequestPermissionsResultListener(pendingPermissionListener);
+        }
+        pendingPermissionListener = new PluginRegistry.RequestPermissionsResultListener() {
+            @Override
+            public boolean onRequestPermissionsResult(int code, String[] permissions, int[] grantResults) {
+                if (code != requestCode) return false;
+                binding.removeRequestPermissionsResultListener(this);
+                pendingPermissionListener = null;
+                result.success(allGranted(grantResults));
+                return true;
+            }
+        };
+        binding.addRequestPermissionsResultListener(pendingPermissionListener);
+    }
+
+    private static boolean allGranted(int[] grantResults) {
+        if (grantResults == null || grantResults.length == 0) return false;
+        for (int grant : grantResults) {
+            if (grant != PackageManager.PERMISSION_GRANTED) return false;
+        }
+        return true;
+    }
 
     private static void addPrinterToDiscoveryPrinterList(DiscoveredPrinter discoveredPrinter) {
-        for (DiscoveredPrinter dp :
-                discoveredPrinters) {
+        for (DiscoveredPrinter dp : discoveredPrinters) {
             if (dp.address.equals(discoveredPrinter.address))
                 return;
         }
-
         discoveredPrinters.add(discoveredPrinter);
     }
 
-
     private static void addNewDiscoverPrinter(final DiscoveredPrinter discoveredPrinter, Context context, final MethodChannel methodChannel) {
-
         addPrinterToDiscoveryPrinterList(discoveredPrinter);
         ((Activity) context).runOnUiThread(() -> {
-            for (DiscoveredPrinter dp :
-                    sendedDiscoveredPrinters) {
+            for (DiscoveredPrinter dp : sendedDiscoveredPrinters) {
                 if (dp.address.equals(discoveredPrinter.address))
                     return;
             }
@@ -279,17 +221,13 @@ public class Printer implements MethodChannel.MethodCallHandler {
             if (discoveredPrinter.getDiscoveryDataMap().get("SYSTEM_NAME") != null) {
                 arguments.put("Name", discoveredPrinter.getDiscoveryDataMap().get("SYSTEM_NAME"));
                 arguments.put("IsWifi", true);
-                methodChannel.invokeMethod("printerFound"
-                        , arguments);
             } else {
                 arguments.put("Name", discoveredPrinter.getDiscoveryDataMap().get("FRIENDLY_NAME"));
                 arguments.put("IsWifi", false);
-                methodChannel.invokeMethod("printerFound"
-                        , arguments);
             }
+            methodChannel.invokeMethod("printerFound", arguments);
         });
     }
-
 
     private static void finishScanPrinter(final Context context, final MethodChannel methodChannel) {
         if (countEndScan == 2) {
@@ -297,81 +235,70 @@ public class Printer implements MethodChannel.MethodCallHandler {
                 if (discoveryPrintersAgain(context, methodChannel))
                     return;
             }
-            ((Activity) context).runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
+            ((Activity) context).runOnUiThread(() ->
                     methodChannel.invokeMethod("onPrinterDiscoveryDone",
-                            context.getResources().getString(R.string.done));
-                }
-            });
+                            context.getResources().getString(R.string.done)));
         }
     }
 
+    /** Retries the discovery once when nothing was found. */
     private static boolean discoveryPrintersAgain(Context context, MethodChannel methodChannel) {
-        System.out.print("Discovery printers again");
         countDiscovery++;
         if (countDiscovery < 2) {
-            discoveryPrinters(context, methodChannel);
+            startDiscovery(context, methodChannel);
             return true;
         }
         return false;
     }
 
-
-    public void print(final String data) {
-        new Thread(new Runnable() {
-            public void run() {
-//                enableTestButton(false);
-                Looper.prepare();
-                doConnectionTest(data);
-                Looper.loop();
-                Looper.myLooper().quit();
+    public void print(final String data, final MethodChannel.Result result) {
+        new Thread(() -> {
+            final boolean sent;
+            try {
+                sent = doConnectionTest(data);
+            } catch (Exception e) {
+                e.printStackTrace();
+                ((Activity) context).runOnUiThread(() -> result.error("print_failed", e.getMessage(), null));
+                return;
             }
+            ((Activity) context).runOnUiThread(() -> result.success(sent));
         }).start();
     }
 
-
-    private void doConnectionTest(String data) {
-
-        if (isZebraPrinter) {
-            if (printer != null) {
-                printData(data);
-            } else {
-                disconnect();
-            }
-        } else {
-            printDataGenericPrinter(data);
+    private boolean doConnectionTest(String data) {
+        if (!isZebraPrinter) {
+            return printDataGenericPrinter(data);
         }
+        if (printer == null) {
+            disconnect();
+            return false;
+        }
+        return printData(data);
     }
 
-    private void printDataGenericPrinter(String data) {
+    private boolean printDataGenericPrinter(String data) {
+        if (socketmanager == null) {
+            setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
+            return false;
+        }
         setStatus(context.getString(R.string.sending_data), context.getString(R.string.connectingColor));
         socketmanager.threadconnectwrite(convertDataToByte(data));
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        if (socketmanager.getIstate()) {
-            setStatus(context.getResources().getString(R.string.done), context.getString(R.string.connectedColor));
-        } else {
-            setStatus(context.getResources().getString(R.string.disconnect), context.getString(R.string.disconnectColor));
-        }
+        sleep(100);
 
-        byte sendCut[] = {0x0a, 0x0a, 0x1d, 0x56, 0x01};
+        byte[] sendCut = {0x0a, 0x0a, 0x1d, 0x56, 0x01};
         socketmanager.threadconnectwrite(sendCut);
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        sleep(100);
+
+        boolean sent = socketmanager.getIstate();
+        if (sent) {
+            setStatus(context.getString(R.string.done), context.getString(R.string.connectedColor));
+        } else {
+            setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
         }
-        if (!socketmanager.getIstate()) {
-            setStatus(context.getResources().getString(R.string.disconnect)
-                    , context.getString(R.string.disconnectColor));
-        }
+        return sent;
     }
 
-    private void printData(String data) {
+    private boolean printData(String data) {
         try {
             byte[] bytes = convertDataToByte(data);
             setStatus(context.getString(R.string.sending_data), context.getString(R.string.connectingColor));
@@ -381,16 +308,19 @@ public class Printer implements MethodChannel.MethodCallHandler {
             if (printerConnection instanceof BluetoothConnection) {
                 DemoSleeper.sleep(500);
             }
-            setStatus(context.getResources().getString(R.string.done), context.getString(R.string.connectedColor));
+            setStatus(context.getString(R.string.done), context.getString(R.string.connectedColor));
+            return true;
         } catch (ConnectionException e) {
             disconnect();
-        } finally {
+            return false;
         }
     }
 
-
     public boolean connectToSelectPrinter(String address) {
         try {
+            if (!isZebraPrinter && isConnectionAlive()) {
+                disconnect(); // close the previous generic (socket) connection
+            }
             isZebraPrinter = true;
             setStatus(context.getString(R.string.connecting), context.getString(R.string.connectingColor));
             selectedAddress = null;
@@ -400,78 +330,39 @@ public class Printer implements MethodChannel.MethodCallHandler {
                 macAddress = address;
                 isBluetoothPrinter = true;
             } else {
-                this.selectedAddress = address;
+                selectedAddress = address;
                 isBluetoothPrinter = false;
             }
             printer = connect(isBluetoothPrinter);
-            if (printer != null) return true;
-            return false;
+            return printer != null;
         } catch (Exception ex) {
             ex.printStackTrace();
             return false;
-
         }
-
     }
 
-    public String isPrinterConnect() {
+    /** True when the current connection (Zebra SDK or generic socket) is open. No data is sent. */
+    private boolean isConnectionAlive() {
         if (isZebraPrinter) {
-            tempIsPrinterConnect = true;
-            if (printerConnection != null && printerConnection.isConnected()) {
-                new Thread(new Runnable() {
-                    public void run() {
-                        try {
-                            printerConnection.write("Test".getBytes());
-                            //This comment is a bad practice.
-//                        if (printerConnection instanceof TcpConnection) {
-//                            TcpConnection printerConnectionTemp = new TcpConnection(getTcpAddress(), getTcpPortNumber());
-//                            try {
-//                                printerConnectionTemp.open();
-//                            } catch (ConnectionException e) {
-//                                disconnect();
-//                                tempIsPrinterConnect = false;
-//
-//                            } finally {
-//                                printerConnectionTemp.close();
-//                            }
-//                        }
-                        } catch (ConnectionException e) {
-                            e.printStackTrace();
-                            disconnect();
-                            tempIsPrinterConnect = false;
-                        }
-                    }
-                }).start();
-                if (tempIsPrinterConnect) {
-                    setStatus(context.getString(R.string.connected), context.getString(R.string.connectedColor));
-                    return context.getString(R.string.connected);
-                } else {
-                    setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
-                    return context.getString(R.string.disconnect);
-                }
-            } else {
-                setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
-                return context.getString(R.string.disconnect);
-            }
-        } else {
-            if (socketmanager != null) {
-                if (socketmanager.getIstate()) {
-                    setStatus(context.getString(R.string.connected), context.getString(R.string.connectedColor));
-                    return context.getString(R.string.connected);
-                } else {
-                    setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
-                    return context.getString(R.string.disconnect);
-                }
-            } else {
-                return context.getString(R.string.disconnect);
-            }
+            return printerConnection != null && printerConnection.isConnected();
         }
+        return socketmanager != null && socketmanager.getIstate();
     }
 
+    /** Updates the status shown in Dart and returns whether the printer is connected. */
+    private boolean refreshConnectionStatus() {
+        boolean connected = isConnectionAlive();
+        if (connected) {
+            setStatus(context.getString(R.string.connected), context.getString(R.string.connectedColor));
+        } else {
+            setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
+        }
+        return connected;
+    }
 
-    public void connectToGenericPrinter(String ipAddress) {
+    public boolean connectToGenericPrinter(String ipAddress) {
         this.isZebraPrinter = false;
-        if (isPrinterConnect().equals(context.getString(R.string.connected))) {
+        if (isConnectionAlive()) {
             disconnect();
             setStatus(context.getString(R.string.connecting), context.getString(R.string.connectingColor));
         }
@@ -480,21 +371,20 @@ public class Printer implements MethodChannel.MethodCallHandler {
         socketmanager.mPort = getGenericPortNumber();
         socketmanager.mstrIp = ipAddress;
         socketmanager.threadconnect();
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        if (socketmanager.getIstate()) {
+        sleep(100);
+
+        boolean connected = socketmanager.getIstate();
+        if (connected) {
             setStatus(context.getString(R.string.connected), context.getString(R.string.connectedColor));
         } else {
             setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
         }
+        return connected;
     }
 
-
+    /** Opens the Zebra SDK connection. Returns null (and reports disconnected) when it fails. */
     public ZebraPrinter connect(boolean isBluetoothPrinter) {
-        if (isPrinterConnect().equals(context.getString(R.string.connected))) {
+        if (isConnectionAlive()) {
             disconnect();
             setStatus(context.getString(R.string.connecting), context.getString(R.string.connectingColor));
         }
@@ -504,53 +394,45 @@ public class Printer implements MethodChannel.MethodCallHandler {
             printerConnection = new BluetoothConnection(getMacAddress());
         } else {
             try {
-
                 printerConnection = new TcpConnection(getTcpAddress(), getTcpPortNumber());
             } catch (NumberFormatException e) {
                 setStatus("Port Invalid", context.getString(R.string.disconnectColor));
                 return null;
             }
         }
+
         try {
             printerConnection.open();
-
         } catch (ConnectionException e) {
             DemoSleeper.sleep(1000);
             disconnect();
             return null;
         }
 
-        ZebraPrinter printer = null;
-
-        if (printerConnection.isConnected()) {
-            try {
-                printer = ZebraPrinterFactory.getInstance(printerConnection);
-            } catch (ConnectionException e) {
-                printer = null;
-                DemoSleeper.sleep(1000);
-                disconnect();
-            } catch (ZebraPrinterLanguageUnknownException e) {
-                printer = null;
-                DemoSleeper.sleep(1000);
-                disconnect();
-            }
+        ZebraPrinter zebraPrinter = null;
+        try {
+            zebraPrinter = ZebraPrinterFactory.getInstance(printerConnection);
+        } catch (ConnectionException e) {
+            DemoSleeper.sleep(1000);
+            disconnect();
+            return null;
+        } catch (ZebraPrinterLanguageUnknownException e) {
+            DemoSleeper.sleep(1000);
+            disconnect();
+            return null;
         }
+
         setStatus(context.getString(R.string.connected), context.getString(R.string.connectedColor));
-        return printer;
+        return zebraPrinter;
     }
 
     private String getMacAddress() {
         return macAddress;
     }
 
-    private static String convertMacAddressToMacAddressApp(String macAddress) {
-        return macAddress;
-    }
-
     private String getTcpAddress() {
         return selectedAddress;
     }
-
 
     public void disconnect() {
         if (isZebraPrinter) {
@@ -559,32 +441,36 @@ public class Printer implements MethodChannel.MethodCallHandler {
                 if (printerConnection != null) {
                     printerConnection.close();
                 }
-
             } catch (ConnectionException e) {
                 e.printStackTrace();
             } finally {
-//            enableTestButton(true);
+                printer = null;
                 setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
             }
         } else {
             setStatus(context.getString(R.string.disconnecting), context.getString(R.string.connectingColor));
-            socketmanager.close();
+            if (socketmanager != null) {
+                socketmanager.close();
+            }
             setStatus(context.getString(R.string.disconnect), context.getString(R.string.disconnectColor));
         }
     }
 
     private void setStatus(final String message, final String color) {
-        ((Activity) context).runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                System.out.println("Printer set status: " + message);
-                HashMap<String, Object> arguments = new HashMap<>();
-                arguments.put("Status", message);
-                arguments.put("Color", color + "");
-                methodChannel.invokeMethod("changePrinterStatus", arguments);
-            }
+        ((Activity) context).runOnUiThread(() -> {
+            HashMap<String, Object> arguments = new HashMap<>();
+            arguments.put("Status", message);
+            arguments.put("Color", color + "");
+            methodChannel.invokeMethod("changePrinterStatus", arguments);
         });
+    }
 
+    private void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private int getTcpPortNumber() {
@@ -624,42 +510,36 @@ public class Printer implements MethodChannel.MethodCallHandler {
         return grayScale;
     }
 
-
     public static Bitmap rotateBitmap(Bitmap source, float angle) {
         Matrix matrix = new Matrix();
         matrix.postRotate(angle);
         return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
     }
 
-    public void setSettings(String settings) {
-        print(settings);
+    public void setSettings(String settings, final MethodChannel.Result result) {
+        print(settings, result);
     }
 
-    public void setDarkness(int darkness) {
-        String setting = "             ! U1 setvar \"print.tone\" \"" + darkness + "\"\n";
-        setSettings(setting);
+    public void setDarkness(int darkness, final MethodChannel.Result result) {
+        String setting = "! U1 setvar \"print.tone\" \"" + darkness + "\"\n";
+        setSettings(setting, result);
     }
 
-    public void setMediaType(String mediaType) {
+    public void setMediaType(String mediaType, final MethodChannel.Result result) {
         String settings;
         if (mediaType.equals("Label")) {
             settings = "! U1 setvar \"media.type\" \"label\"\n" +
-                    "             ! U1 setvar \"media.sense_mode\" \"gap\"\n" +
-                    //    "             ! U1 setvar \"print.tone\" \"0\"\n" +
-                    "              ~jc^xa^jus^xz";
+                    "! U1 setvar \"media.sense_mode\" \"gap\"\n" +
+                    "~jc^xa^jus^xz";
         } else if (mediaType.equals("BlackMark")) {
             settings = "! U1 setvar \"media.type\" \"label\"\n" +
-                    "             ! U1 setvar \"media.sense_mode\" \"bar\"\n" +
-                    //    "             ! U1 setvar \"print.tone\" \"0\"\n" +
-                    "              ~jc^xa^jus^xz";
+                    "! U1 setvar \"media.sense_mode\" \"bar\"\n" +
+                    "~jc^xa^jus^xz";
         } else {
-            settings = //"! U1 SPEED 4\n" +
-                    "      ! U1 setvar \"print.tone\" \"0\"\n" +
-                            "      ! U1 setvar \"media.type\" \"journal\"\n";
-            //   "      ! U1 setvar \"media.sense_mode\" \"bar\"" +
-            // " ~jc^xa^jus^xz";
+            settings = "! U1 setvar \"print.tone\" \"0\"\n" +
+                    "! U1 setvar \"media.type\" \"journal\"\n";
         }
-        setSettings(settings);
+        setSettings(settings, result);
     }
 
     private void convertBase64ImageToZPLString(String data, int rotation, MethodChannel.Result result) {
@@ -675,41 +555,36 @@ public class Printer implements MethodChannel.MethodCallHandler {
     @Override
     public void onMethodCall(@NonNull final MethodCall call, @NonNull final MethodChannel.Result result) {
         try {
-
             switch (call.method) {
-                case "print":
-                    print(call.argument("Data"));
+                case "print": {
+                    String data = call.argument("Data");
+                    if (data == null) {
+                        result.error("invalid_argument", "Data is required", null);
+                        break;
+                    }
+                    print(data, result);
                     break;
+                }
                 case "checkPermission":
-                    checkPermission(context, result);
+                    checkPermission(result);
                     break;
                 case "convertBase64ImageToZPLString":
-                    convertBase64ImageToZPLString(call.argument("data")
-                            , Integer.parseInt(Objects.requireNonNull(call.argument("rotation")).toString()), result);
+                    convertBase64ImageToZPLString(call.argument("data"),
+                            Integer.parseInt(Objects.requireNonNull(call.argument("rotation")).toString()), result);
                     break;
                 case "disconnect":
                     new Thread(() -> {
                         try {
                             disconnect();
-                            ((Activity) context).runOnUiThread(() -> {
-                                try {
-                                    result.success(null);
-                                } catch (Exception ignored) {
-                                }
-                            });
+                            ((Activity) context).runOnUiThread(() -> result.success(null));
                         } catch (Exception ex) {
                             ex.printStackTrace();
-                            ((Activity) context).runOnUiThread(() -> {
-                                try {
-                                    result.error("disconnect_failed", ex.getMessage(), null);
-                                } catch (Exception ignored) {
-                                }
-                            });
+                            ((Activity) context).runOnUiThread(() -> result.error("disconnect_failed", ex.getMessage(), null));
                         }
                     }).start();
                     break;
                 case "isPrinterConnected":
-                    isPrinterConnect();
+                    result.success(refreshConnectionStatus());
                     break;
                 case "discoverPrinters":
                     if (checkIsLocationNetworkProviderIsOn()) {
@@ -717,47 +592,60 @@ public class Printer implements MethodChannel.MethodCallHandler {
                     } else {
                         onDiscoveryError(context, methodChannel, ON_DISCOVERY_ERROR_LOCATION, "Your location service is off.");
                     }
-
+                    result.success(null);
                     break;
-                case "setMediaType":
+                case "setMediaType": {
                     String mediaType = call.argument("MediaType");
-                    if (mediaType != null) {
-                        setMediaType(mediaType);
+                    if (mediaType == null) {
+                        result.error("invalid_argument", "MediaType is required", null);
+                        break;
                     }
+                    setMediaType(mediaType, result);
                     break;
-                case "setSettings":
+                }
+                case "setSettings": {
                     String settingCommand = call.argument("SettingCommand");
-                    setSettings(settingCommand);
+                    if (settingCommand == null) {
+                        result.error("invalid_argument", "SettingCommand is required", null);
+                        break;
+                    }
+                    setSettings(settingCommand, result);
                     break;
-                case "setDarkness":
-                    int darkness = call.argument("Darkness");
-                    setDarkness(darkness);
+                }
+                case "setDarkness": {
+                    Integer darkness = call.argument("Darkness");
+                    if (darkness == null) {
+                        result.error("invalid_argument", "Darkness is required", null);
+                        break;
+                    }
+                    setDarkness(darkness, result);
                     break;
-                case "connectToPrinter":
+                }
+                case "connectToPrinter": {
+                    final String address = call.argument("Address");
                     new Thread(() -> {
-                        final boolean connected = connectToSelectPrinter(call.argument("Address"));
-                        Log.d("ZebraPrinter", "connect address: " + call.argument("Address") + " connected=" + connected);
-                        ((Activity) context).runOnUiThread(() -> {
-                            try {
-                                result.success(connected);
-                            } catch (Exception ignored) {
-                            }
-                        });
+                        final boolean connected = address != null && connectToSelectPrinter(address);
+                        ((Activity) context).runOnUiThread(() -> result.success(connected));
                     }).start();
                     break;
-                case ("connectToGenericPrinter"):
-                    connectToGenericPrinter(call.argument("Address"));
+                }
+                case "connectToGenericPrinter": {
+                    String address = call.argument("Address");
+                    if (address == null) {
+                        result.error("invalid_argument", "Address is required", null);
+                        break;
+                    }
+                    result.success(connectToGenericPrinter(address));
                     break;
+                }
                 default:
                     result.notImplemented();
                     break;
             }
-
         } catch (Exception ex) {
             ex.printStackTrace();
+            result.error("native_error", ex.getMessage(), null);
         }
-
-
     }
 
     private boolean checkIsLocationNetworkProviderIsOn() {
